@@ -1,10 +1,14 @@
-import { FormEvent, useMemo, useRef, useState } from 'react'
+import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react'
 import { getFFmpeg } from '../lib/ffmpeg'
 import { fetchFile } from '@ffmpeg/util'
-import { FileVideo, Loader2 } from 'lucide-react'
+import { CheckCircle, FileVideo, Upload } from 'lucide-react'
 import { api } from '../lib/axios'
+import { Separator } from './ui/separator'
+import { Label } from './ui/label'
+import { Textarea } from './ui/textarea'
+import { Button } from './ui/button'
 
-interface VideoUploadFormProps {
+interface VideoInputFormProps {
   onTranscriptionGenerated: (videoId: string) => void
 }
 
@@ -15,9 +19,24 @@ type TranscriptionStatus =
   | 'generating'
   | 'success'
 
-export function VideoUploadForm({
+const transcriptionStatusMessages: Record<
+  Exclude<TranscriptionStatus, 'waiting'>,
+  ReactNode
+> = {
+  converting: 'Convertendo...',
+  generating: 'Transcrevendo...',
+  uploading: 'Carregando...',
+  success: (
+    <>
+      Sucesso!
+      <CheckCircle className="w-4 h-4 ml-2" />
+    </>
+  ),
+} as const
+
+export function VideoInputForm({
   onTranscriptionGenerated,
-}: VideoUploadFormProps) {
+}: VideoInputFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [transcriptionStatus, setTranscriptionStatus] =
     useState<TranscriptionStatus>('waiting')
@@ -116,54 +135,63 @@ export function VideoUploadForm({
   }, [videoFile])
 
   return (
-    <form
-      onSubmit={handleGenerateTranscription}
-      className="w-full max-w-[440px] space-y-4"
-    >
-      <label className="rounded-md relative border overflow-hidden border-slate-700 flex text-sm gap-3 items-center justify-center aspect-video w-full text-slate-400 cursor-pointer transition-colors border-dashed hover:text-slate-300 hover:border-slate-600 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-slate-900 focus-within:ring-sky-500">
-        {videoPreviewURL ? (
-          <video
-            src={videoPreviewURL}
-            controls={false}
-            className="absolute inset-0 pointer-events-none"
-          />
-        ) : (
-          <>
-            <FileVideo className="w-4 h-4" />
-            Select a video file
-          </>
-        )}
+    <form onSubmit={handleGenerateTranscription} className="space-y-6">
+      <div className="space-y-1">
+        <label
+          htmlFor="video"
+          className="relative aspect-video border cursor-pointer border-dashed rounded-md text-sm flex flex-col gap-2 items-center justify-center text-muted-foreground hover:bg-primary/5"
+        >
+          {videoPreviewURL ? (
+            <video
+              src={videoPreviewURL}
+              controls={false}
+              className="pointer-events-none absolute inset-0"
+            />
+          ) : (
+            <>
+              <FileVideo className="w-4 h-4" />
+              Selecione um vídeo
+            </>
+          )}
+        </label>
 
         <input
           type="file"
+          id="video"
           accept="video/*"
           className="sr-only"
           onChange={handleFileSelected}
           required
         />
-      </label>
+      </div>
 
-      <div className="space-y-1">
-        <textarea
+      <Separator />
+
+      <div className="space-y-2">
+        <Label>Prompt de transcrição</Label>
+        <Textarea
           ref={promptInputRef}
-          name="prompt"
-          className="w-full leading-normal bg-slate-800 rounded-md resize-y min-h-[96px] max-h-[200px] outline-none p-3 scroll-pb-3 text-sm text-slate-100 focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-sky-500"
-          placeholder="Include any technical terms, separated by commas, to help the translator achieve a better result."
-          required
+          disabled={transcriptionStatus !== 'waiting'}
+          className="h-[80px] leading-relaxed"
+          placeholder="Inclua palavras-chave mencionadas no vídeo separadas por vírgula (,)"
         />
       </div>
 
-      <button
+      <Button
         type="submit"
+        className="w-full data-[status=success]:bg-emerald-400"
+        data-status={transcriptionStatus}
         disabled={transcriptionStatus !== 'waiting'}
-        className="bg-sky-500 w-full py-2.5 px-3 text-slate-50 font-semibold text-sm rounded-md outline-none hover:bg-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:ring-sky-500 disabled:opacity-70"
       >
-        {transcriptionStatus !== 'waiting' ? (
-          <Loader2 className="w-4 h-4 animate-spin inline" />
+        {transcriptionStatus === 'waiting' ? (
+          <>
+            Carregar vídeo
+            <Upload className="ml-2 w-4 h-4" />
+          </>
         ) : (
-          'Translate'
+          transcriptionStatusMessages[transcriptionStatus]
         )}
-      </button>
+      </Button>
     </form>
   )
 }
